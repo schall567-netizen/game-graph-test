@@ -1,0 +1,252 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <title>게임 구성요소 다단(Depth) 연관 그래프</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #020617;
+            color: #e5e7eb;
+            margin: 0;
+            padding: 24px;
+        }
+        h1 {
+            margin: 0 0 4px 4px;
+            font-size: 22px;
+        }
+        .subtitle {
+            margin: 0 0 12px 4px;
+            color: #9ca3af;
+            font-size: 13px;
+        }
+        .graph-container {
+            background: #020617;
+            border-radius: 12px;
+            border: 1px solid #1f2937;
+            width: 100%;
+            height: 780px;
+            position: relative;
+            overflow: hidden;
+        }
+        svg {
+            width: 100%;
+            height: 100%;
+        }
+        .link {
+            stroke: #4b5563;
+            stroke-opacity: 0.45;
+            stroke-width: 1px;
+        }
+        .node circle {
+            stroke: #020617;
+            stroke-width: 1px;
+        }
+        .node text {
+            font-size: 10.5px;
+            pointer-events: none;
+            fill: #e5e7eb;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+        }
+        .tooltip {
+            position: absolute;
+            pointer-events: none;
+            background: rgba(15,23,42,0.96);
+            color: #e5e7eb;
+            padding: 6px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            border: 1px solid #374151;
+            max-width: 260px;
+            line-height: 1.4;
+            z-index: 20;
+        }
+        .legend {
+            margin-top: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            font-size: 11px;
+            color: #9ca3af;
+        }
+        .legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .legend-color {
+            width: 10px;
+            height: 10px;
+            border-radius: 999px;
+        }
+    </style>
+</head>
+<body>
+    <h1>게임 구성요소 유기적 연관 그래프 (다단 구조)</h1>
+    <p class="subtitle">
+        상위 축 → 중간 카테고리 → 세부 평가 항목까지 포함한 네트워크 그래프입니다.<br/>
+        노드에 마우스를 올리면 이름, 선에 올리면 관계 설명이 표시되고, 노드를 드래그해서 위치를 조정할 수 있습니다.
+    </p>
+    <div class="graph-container" id="graph"></div>
+    <div class="legend">
+        <div class="legend-item"><span class="legend-color" style="background:#f97316;"></span>메타(전체 평가)</div>
+        <div class="legend-item"><span class="legend-color" style="background:#22c55e;"></span>코어 축 (세계관/아트/스토리/캐릭터/몬스터)</div>
+        <div class="legend-item"><span class="legend-color" style="background:#3b82f6;"></span>경험·시스템 (UX/시스템/오디오)</div>
+        <div class="legend-item"><span class="legend-color" style="background:#eab308;"></span>비즈니스·라이브 (경제/라이브/수익화)</div>
+        <div class="legend-item"><span class="legend-color" style="background:#22c55e80;"></span>세계관 중간 카테고리</div>
+        <div class="legend-item"><span class="legend-color" style="background:#22c55e40;"></span>세계관 세부 평가 항목</div>
+    </div>
+
+    <script>
+    const graphData = {"nodes": [{"id": "GAME_QUALITY", "label": "Game 전체 평가", "group": "meta"}, {"id": "WORLD", "label": "세계관", "group": "core"}, {"id": "ART", "label": "아트(비주얼)", "group": "core"}, {"id": "STORY", "label": "스토리", "group": "core"}, {"id": "CHARACTER", "label": "캐릭터", "group": "core"}, {"id": "MONSTER_NPC", "label": "몬스터 / NPC", "group": "core"}, {"id": "UX", "label": "UX / 플레이 경험", "group": "experience"}, {"id": "SYSTEM", "label": "시스템·게임디자인", "group": "experience"}, {"id": "AUDIO", "label": "오디오(음악·SFX)", "group": "experience"}, {"id": "ECONOMY", "label": "경제 / 보상 구조", "group": "biz"}, {"id": "LIVEOPS", "label": "라이브옵스·이벤트", "group": "biz"}, {"id": "MONETIZATION", "label": "수익화(과금 구조)", "group": "biz"}, {"id": "WORLD_ART_FIT", "label": "세계관 ↔ 아트 적합성", "group": "world_mid"}, {"id": "WORLD_STORY_MOOD", "label": "세계관 ↔ 스토리 분위기", "group": "world_mid"}, {"id": "WORLD_CHARACTER_FIT", "label": "세계관 ↔ 주인공 서사/연출", "group": "world_mid"}, {"id": "WORLD_CREATURE_FIT", "label": "세계관 ↔ 생명체(몬스터/NPC)", "group": "world_mid"}, {"id": "WORLD_ART_FIT_BACKGROUND", "label": "배경/환경이 세계관 테마와 일치하는가?", "group": "world_detail"}, {"id": "WORLD_ART_FIT_COLOR", "label": "컬러·라이팅이 세계관 분위기를 살리는가?", "group": "world_detail"}, {"id": "WORLD_STORY_MOOD_THEME", "label": "스토리 테마가 세계관 키워드와 일관적인가?", "group": "world_detail"}, {"id": "WORLD_STORY_MOOD_PACING", "label": "전개 속도·톤이 세계관 분위기와 맞는가?", "group": "world_detail"}, {"id": "WORLD_CHARACTER_FIT_ARCH", "label": "주인공 성장·갈등이 세계관 룰 안에서 자연스러운가?", "group": "world_detail"}, {"id": "WORLD_CHARACTER_FIT_PRESENT", "label": "연출·컷신이 세계관 톤과 맞는가?", "group": "world_detail"}, {"id": "WORLD_CREATURE_FIT_ECOLOGY", "label": "몬스터/NPC 생태·역할이 설정과 맞는가?", "group": "world_detail"}, {"id": "WORLD_CREATURE_FIT_VISUAL", "label": "비주얼·애니가 세계관에 어울리는가?", "group": "world_detail"}, {"id": "UX_FLOW", "label": "플로우/진행 동선", "group": "ux_mid"}, {"id": "UX_READABILITY", "label": "정보 가독성", "group": "ux_mid"}, {"id": "UX_FEEDBACK", "label": "피드백(사운드/VFX/UI)", "group": "ux_mid"}, {"id": "UX_FLOW_WORLD_INTRO", "label": "세계관 소개 흐름이 자연스러운가?", "group": "ux_detail"}, {"id": "UX_READABILITY_STATUS", "label": "체력/버프/디버프 등 상태 정보가 한눈에 들어오는가?", "group": "ux_detail"}, {"id": "UX_FEEDBACK_DANGER", "label": "위험 상황이 시각·소리로 명확히 구분되는가?", "group": "ux_detail"}, {"id": "SYSTEM_CORE_LOOP", "label": "코어 루프", "group": "system_mid"}, {"id": "SYSTEM_DIFFICULTY", "label": "난이도 곡선", "group": "system_mid"}, {"id": "SYSTEM_CORE_LOOP_WORLD_MEANING", "label": "플레이 루프가 세계관 상 의미를 가지는가?", "group": "system_detail"}, {"id": "SYSTEM_DIFFICULTY_FAIR", "label": "난이도가 공정하게 느껴지는가?", "group": "system_detail"}], "links": [{"source": "GAME_QUALITY", "target": "WORLD", "reason": "게임 정체성과 몰입"}, {"source": "GAME_QUALITY", "target": "ART", "reason": "첫인상·브랜딩·읽기성"}, {"source": "GAME_QUALITY", "target": "STORY", "reason": "플레이 동기·몰입"}, {"source": "GAME_QUALITY", "target": "CHARACTER", "reason": "애착·팬덤의 중심"}, {"source": "GAME_QUALITY", "target": "MONSTER_NPC", "reason": "전투·세계 밀도"}, {"source": "GAME_QUALITY", "target": "UX", "reason": "실제 플레이 경험 품질"}, {"source": "GAME_QUALITY", "target": "SYSTEM", "reason": "재미의 구조·룰 설계"}, {"source": "GAME_QUALITY", "target": "AUDIO", "reason": "감정선·타격감"}, {"source": "GAME_QUALITY", "target": "ECONOMY", "reason": "성장·보상 피로도"}, {"source": "GAME_QUALITY", "target": "LIVEOPS", "reason": "장기 서비스 유지력"}, {"source": "GAME_QUALITY", "target": "MONETIZATION", "reason": "과금 공정성·신뢰도"}, {"source": "WORLD", "target": "WORLD_ART_FIT", "reason": "세계관과 어울리는 배경/비주얼 평가 축"}, {"source": "WORLD", "target": "WORLD_STORY_MOOD", "reason": "세계관 분위기에 맞는 내러티브 평가 축"}, {"source": "WORLD", "target": "WORLD_CHARACTER_FIT", "reason": "주인공 서사·연출이 세계관에 맞는지"}, {"source": "WORLD", "target": "WORLD_CREATURE_FIT", "reason": "몬스터·NPC가 세계관과 맞는지"}, {"source": "WORLD_ART_FIT", "target": "WORLD_ART_FIT_BACKGROUND", "reason": "배경/환경 디자인의 세계관 적합성"}, {"source": "WORLD_ART_FIT", "target": "WORLD_ART_FIT_COLOR", "reason": "컬러·라이팅의 세계관 분위기 적합성"}, {"source": "WORLD_STORY_MOOD", "target": "WORLD_STORY_MOOD_THEME", "reason": "테마·메시지 일관성"}, {"source": "WORLD_STORY_MOOD", "target": "WORLD_STORY_MOOD_PACING", "reason": "전개 속도·톤의 일관성"}, {"source": "WORLD_CHARACTER_FIT", "target": "WORLD_CHARACTER_FIT_ARCH", "reason": "성장·갈등이 설정과 맞는지"}, {"source": "WORLD_CHARACTER_FIT", "target": "WORLD_CHARACTER_FIT_PRESENT", "reason": "컷신·연출이 세계관 톤과 맞는지"}, {"source": "WORLD_CREATURE_FIT", "target": "WORLD_CREATURE_FIT_ECOLOGY", "reason": "생태·역할이 설정에 맞는지"}, {"source": "WORLD_CREATURE_FIT", "target": "WORLD_CREATURE_FIT_VISUAL", "reason": "비주얼·애니가 세계관에 어울리는지"}, {"source": "WORLD_ART_FIT_BACKGROUND", "target": "ART", "reason": "배경 아트 품질·일관성"}, {"source": "WORLD_ART_FIT_COLOR", "target": "ART", "reason": "컬러·라이팅 연출"}, {"source": "WORLD_STORY_MOOD_THEME", "target": "STORY", "reason": "이야기 테마·메시지"}, {"source": "WORLD_STORY_MOOD_PACING", "target": "STORY", "reason": "스토리 템포·장면 구성"}, {"source": "WORLD_CHARACTER_FIT_ARCH", "target": "CHARACTER", "reason": "캐릭터 아크·심리·동기"}, {"source": "WORLD_CHARACTER_FIT_PRESENT", "target": "CHARACTER", "reason": "연출·애니·보이스 관점 캐릭터성"}, {"source": "WORLD_CREATURE_FIT_ECOLOGY", "target": "MONSTER_NPC", "reason": "몬스터/NPC 역할·행동 패턴"}, {"source": "WORLD_CREATURE_FIT_VISUAL", "target": "MONSTER_NPC", "reason": "시각적 통일성·인식 가능성"}, {"source": "WORLD", "target": "SYSTEM_CORE_LOOP_WORLD_MEANING", "reason": "플레이 루프가 세계관 상 의미를 가지는지"}, {"source": "WORLD", "target": "AUDIO", "reason": "BGM/사운드가 세계관 톤을 뒷받침하는지"}, {"source": "UX", "target": "UX_FLOW", "reason": "진행 동선·플로우"}, {"source": "UX", "target": "UX_READABILITY", "reason": "정보 가독성"}, {"source": "UX", "target": "UX_FEEDBACK", "reason": "피드백 경험"}, {"source": "UX_FLOW", "target": "UX_FLOW_WORLD_INTRO", "reason": "세계관 소개 경험"}, {"source": "UX_READABILITY", "target": "UX_READABILITY_STATUS", "reason": "상태 정보 UI"}, {"source": "UX_FEEDBACK", "target": "UX_FEEDBACK_DANGER", "reason": "위험 상황 피드백"}, {"source": "UX_FLOW_WORLD_INTRO", "target": "WORLD", "reason": "세계관 정보 제시 방식"}, {"source": "UX_READABILITY_STATUS", "target": "SYSTEM", "reason": "전투/상태 시스템 이해도"}, {"source": "UX_FEEDBACK_DANGER", "target": "AUDIO", "reason": "경고음·사운드 피드백과 연결"}, {"source": "UX_FEEDBACK_DANGER", "target": "ART", "reason": "위험 상황 VFX/컬러와 연결"}, {"source": "SYSTEM", "target": "SYSTEM_CORE_LOOP", "reason": "핵심 반복 구조"}, {"source": "SYSTEM", "target": "SYSTEM_DIFFICULTY", "reason": "난이도 구조"}, {"source": "SYSTEM_CORE_LOOP", "target": "SYSTEM_CORE_LOOP_WORLD_MEANING", "reason": "코어 루프의 세계관 의미 부여"}, {"source": "SYSTEM_DIFFICULTY", "target": "SYSTEM_DIFFICULTY_FAIR", "reason": "난이도 공정성"}, {"source": "SYSTEM_CORE_LOOP_WORLD_MEANING", "target": "WORLD", "reason": "루프가 세계 설정과 연결되는가"}, {"source": "SYSTEM_DIFFICULTY_FAIR", "target": "UX", "reason": "체감 난이도는 UX와 결합해서 평가"}, {"source": "SYSTEM_DIFFICULTY_FAIR", "target": "ECONOMY", "reason": "보상/성장과의 밸런스"}, {"source": "ECONOMY", "target": "LIVEOPS", "reason": "이벤트 보상·배틀패스 구조"}, {"source": "ECONOMY", "target": "MONETIZATION", "reason": "무료/과금 보상 비율"}, {"source": "LIVEOPS", "target": "MONETIZATION", "reason": "배너·상품·한정 패키지 설계"}]};
+
+    const colorByGroup = (group) => {
+        if (group === "meta") return "#f97316";       // 주황
+        if (group === "core") return "#22c55e";       // 진한 초록
+        if (group === "experience") return "#3b82f6"; // 파랑
+        if (group === "biz") return "#eab308";        // 노랑
+        if (group === "world_mid") return "#4ade80";  // 연초록
+        if (group === "world_detail") return "#bbf7d0"; // 아주 연한 초록
+        if (group === "ux_mid") return "#60a5fa";     // UX 중간
+        if (group === "ux_detail") return "#bfdbfe";  // UX 세부
+        if (group === "system_mid") return "#a855f7"; // 시스템 중간
+        if (group === "system_detail") return "#e9d5ff"; // 시스템 세부
+        return "#a855f7"; // 기타
+    };
+
+    const container = document.getElementById("graph");
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+
+    const svg = d3.select("#graph")
+        .append("svg")
+        .attr("viewBox", [0, 0, width, height])
+        .attr("preserveAspectRatio", "xMidYMid meet");
+
+    const tooltip = d3.select("body")
+        .append("div")
+        .attr("class", "tooltip")
+        .style("opacity", 0);
+
+    const link = svg.append("g")
+        .attr("stroke-linecap", "round")
+        .selectAll("line")
+        .data(graphData.links)
+        .enter()
+        .append("line")
+        .attr("class", "link");
+
+    const node = svg.append("g")
+        .selectAll("g")
+        .data(graphData.nodes)
+        .enter()
+        .append("g")
+        .attr("class", "node")
+        .call(d3.drag()
+            .on("start", dragstarted)
+            .on("drag", dragged)
+            .on("end", dragended));
+
+    node.append("circle")
+        .attr("r", d => {
+            if (d.id === "GAME_QUALITY") return 18;
+            if (["WORLD", "ART", "STORY", "CHARACTER", "MONSTER_NPC",
+                 "UX", "SYSTEM", "AUDIO", "ECONOMY", "LIVEOPS", "MONETIZATION"].includes(d.id)) return 13;
+            if (d.group && d.group.endsWith("_mid")) return 11;
+            return 9;
+        })
+        .attr("fill", d => colorByGroup(d.group))
+        .on("mouseover", (event, d) => {
+            tooltip
+                .style("opacity", 1)
+                .html(`<strong>${d.label}</strong><br/><span style="color:#9ca3af;">group: ${d.group}</span>`);
+        })
+        .on("mousemove", (event) => {
+            tooltip
+                .style("left", (event.pageX + 10) + "px")
+                .style("top", (event.pageY + 10) + "px");
+        })
+        .on("mouseout", () => {
+            tooltip.style("opacity", 0);
+        });
+
+    node.append("text")
+        .attr("x", 0)
+        .attr("y", 3)
+        .attr("text-anchor", "middle")
+        .text(d => d.label);
+
+    link
+        .on("mouseover", (event, d) => {
+            tooltip
+                .style("opacity", 1)
+                .html(`<strong>관계 설명</strong><br/>${d.reason || ""}`);
+        })
+        .on("mousemove", (event) => {
+            tooltip
+                .style("left", (event.pageX + 10) + "px")
+                .style("top", (event.pageY + 10) + "px");
+        })
+        .on("mouseout", () => {
+            tooltip.style("opacity", 0);
+        });
+
+    const simulation = d3.forceSimulation(graphData.nodes)
+        .force("link", d3.forceLink(graphData.links)
+            .id(d => d.id)
+            .distance(d => {
+                // 메타와 상위 축은 좀 멀리
+                if (d.source.id === "GAME_QUALITY" || d.target.id === "GAME_QUALITY") return 180;
+                // 상위축 ↔ 상위축
+                const top = ["WORLD","ART","STORY","CHARACTER","MONSTER_NPC","UX","SYSTEM","AUDIO","ECONOMY","LIVEOPS","MONETIZATION"];
+                if (top.includes(d.source.id) && top.includes(d.target.id)) return 160;
+                // 중간 ↔ 세부는 가까이
+                if (String(d.source.group || "").endsWith("_mid") && String(d.target.group || "").endsWith("_detail")) return 80;
+                if (String(d.target.group || "").endsWith("_mid") && String(d.source.group || "").endsWith("_detail")) return 80;
+                return 110;
+            })
+            .strength(0.7)
+        )
+        .force("charge", d3.forceManyBody().strength(-260))
+        .force("center", d3.forceCenter(width / 2, height / 2))
+        .force("collision", d3.forceCollide().radius(d => {
+            if (d.id === "GAME_QUALITY") return 32;
+            if (["WORLD", "ART", "STORY", "CHARACTER", "MONSTER_NPC",
+                 "UX", "SYSTEM", "AUDIO", "ECONOMY", "LIVEOPS", "MONETIZATION"].includes(d.id)) return 24;
+            if (d.group && d.group.endsWith("_mid")) return 20;
+            return 16;
+        }))
+        .on("tick", ticked);
+
+    function ticked() {
+        link
+            .attr("x1", d => d.source.x)
+            .attr("y1", d => d.source.y)
+            .attr("x2", d => d.target.x)
+            .attr("y2", d => d.target.y);
+
+        node
+            .attr("transform", d => `translate(${d.x}, ${d.y})`);
+    }
+
+    function dragstarted(event, d) {
+        if (!event.active) simulation.alphaTarget(0.3).restart();
+        d.fx = d.x;
+        d.fy = d.y;
+    }
+
+    function dragged(event, d) {
+        d.fx = event.x;
+        d.fy = event.y;
+    }
+
+    function dragended(event, d) {
+        if (!event.active) simulation.alphaTarget(0);
+        d.fx = null;
+        d.fy = null;
+    }
+    </script>
+</body>
+</html>
